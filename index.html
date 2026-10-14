@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photo Booth | Road Safety Congress 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=Overpass:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* ---- Theme: change these to match official brand colours ---- */
+  :root{
+    --brand:#123C7A; --brand-dk:#0C2C5C; --brand-tint:#E9EFF8;
+    --accent:#F2A900;
+    --ink:#16223A; --ink-2:#47536A; --muted:#6B7588;
+    --line:#DCE1E9; --surface:#FFFFFF; --canvas:#F4F6F9; --stage:#0F1A2E;
+    --ok:#1E7F52; --ok-tint:#E6F4EC; --err:#B42318; --err-tint:#FDECEA;
+    --ui:"Public Sans","Segoe UI",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%}
+  body{background:var(--canvas);color:var(--ink);font:400 15px/1.5 var(--ui);overflow:hidden;-webkit-font-smoothing:antialiased}
+  button,input{font:inherit;color:inherit}
+  :focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+
+  .app{display:grid;grid-template-rows:auto 1fr;height:100vh}
+
+  /* Header */
+  .topbar{position:relative;display:flex;align-items:center;gap:16px;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--line)}
+  .topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:linear-gradient(90deg,var(--brand) 0 72%,var(--accent) 72% 100%)}
+  .mark{flex:none;width:44px;height:44px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px}
+  .logo{flex:none;height:44px;width:auto}
+  .event{flex:1;min-width:0}
+  .event-name{font-size:17px;font-weight:700;line-height:1.25}
+  .event-theme{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .event-meta{flex:none;text-align:right;font-size:13px;line-height:1.4;color:var(--ink-2);padding-right:4px}
+  .event-meta strong{display:block;color:var(--ink);font-weight:600}
+  .icon-btn{flex:none;width:40px;height:40px;display:grid;place-items:center;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);border-radius:8px;cursor:pointer}
+  .icon-btn:hover{background:var(--canvas);color:var(--ink)}
+
+  .main{display:grid;grid-template-columns:1fr 400px;min-height:0}
+
+  /* Camera stage */
+  .stage-wrap{background:var(--stage);display:flex;align-items:center;justify-content:center;padding:28px;min-height:0}
+  .stage{position:relative;width:min(100%,calc((100vh - 140px)*4/3));aspect-ratio:4/3;background:#000;border-radius:8px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.08),0 24px 48px rgba(0,0,0,.35)}
+  .stage video,.stage img,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .stage video.mirror{transform:scaleX(-1)}
+  #review{display:none}
+  .stage.reviewing #review{display:block}
+  .stage.reviewing #overlay,.stage.reviewing video{visibility:hidden}
+  .count{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;opacity:0;
+    font:800 clamp(120px,20vw,260px)/1 var(--ui);color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.55)}
+  .count.show{animation:pop 1s ease-out}
+  @keyframes pop{0%{transform:scale(1.3);opacity:0}20%{transform:scale(1);opacity:1}80%{opacity:1}100%{opacity:0;transform:scale(.94)}}
+  .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+  .flash.go{animation:flash .45s ease-out}
+  @keyframes flash{from{opacity:.95}to{opacity:0}}
+  .cam-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;text-align:center;background:var(--stage);color:#fff}
+  .cam-error[hidden]{display:none}
+  .cam-error h2{font-size:20px;font-weight:700}
+  .cam-error p{max-width:46ch;color:#AEB7C6}
+
+  /* Side panel */
+  .panel{background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  .panel-body{flex:1 0 auto;padding:24px 28px;display:flex;flex-direction:column;gap:24px}
+  .panel-foot{padding:14px 28px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+
+  .steps{list-style:none;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;counter-reset:s}
+  .steps li{counter-increment:s;display:flex;flex-direction:column;gap:8px;font-size:12.5px;font-weight:600;color:var(--muted)}
+  .steps li::before{content:"";height:4px;border-radius:2px;background:var(--line)}
+  .steps li span::before{content:counter(s) ". "}
+  .steps li.done{color:var(--ink-2)}
+  .steps li.done::before,.steps li[aria-current]::before{background:var(--brand)}
+  .steps li[aria-current]{color:var(--brand)}
+
+  .section{display:flex;flex-direction:column;gap:16px}
+  .section[hidden]{display:none}
+  .section h2{font-size:20px;font-weight:700;line-height:1.3}
+  .lead{color:var(--muted);font-size:14px;margin-top:-10px}
+
+  .frames{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .frame-btn{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:0;overflow:hidden;cursor:pointer;text-align:left;transition:border-color .15s,box-shadow .15s}
+  .frame-btn:hover:not(:disabled){border-color:#B6C1D2}
+  .frame-btn:disabled{cursor:default}
+  .frame-btn canvas{display:block;width:100%;aspect-ratio:4/3}
+  .frame-btn span{display:block;padding:8px 10px;font-size:13.5px;font-weight:600}
+  .frame-btn[aria-pressed="true"]{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
+  .frame-btn[aria-pressed="true"] span{color:var(--brand)}
+  .frame-btn[aria-pressed="true"]::after{content:"";position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;
+    background:var(--brand) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/13px no-repeat}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;border-radius:8px;padding:14px 18px;font-weight:600;font-size:16px;line-height:1.2;cursor:pointer;border:1px solid transparent;transition:background .15s,border-color .15s}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-primary{background:var(--brand);color:#fff}
+  .btn-primary:hover:not(:disabled){background:var(--brand-dk)}
+  .btn-secondary{background:var(--surface);color:var(--ink);border-color:var(--line)}
+  .btn-secondary:hover:not(:disabled){background:var(--canvas)}
+  .btn-lg{padding:18px;font-size:17px}
+  .btn-row{display:flex;flex-direction:column;gap:10px}
+  .hint{font-size:13px;color:var(--muted);text-align:center}
+  kbd{font:600 12px var(--ui);color:var(--ink-2);background:var(--canvas);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+
+  .field{display:flex;flex-direction:column;gap:6px;font-size:13.5px;font-weight:600;color:var(--ink-2)}
+  .field input{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:11px 12px;font-size:16px;font-weight:400}
+  .field input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)}
+  .field-hint{font-size:12.5px;font-weight:400;color:var(--muted)}
+  .field-hint.bad{color:var(--err)}
+  .consent{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:var(--canvas);border:1px solid var(--line);border-radius:8px;font-size:13.5px;line-height:1.45;color:var(--ink-2);cursor:pointer}
+  .consent input{width:18px;height:18px;flex:none;accent-color:var(--brand);margin-top:1px}
+
+  .status-icon{width:56px;height:56px;border-radius:50%;display:grid;place-items:center}
+  .status-icon.sending{border:5px solid var(--brand-tint);border-top-color:var(--brand);animation:spin .9s linear infinite}
+  .status-icon.done{background:var(--ok-tint);color:var(--ok)}
+  .status-icon.error{background:var(--err-tint);color:var(--err)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .status-msg{color:var(--ink-2)}
+
+  dialog{border:0;border-radius:12px;padding:0;background:var(--surface);color:var(--ink);width:min(520px,92vw);box-shadow:0 24px 60px rgba(15,26,46,.3)}
+  dialog::backdrop{background:rgba(15,26,46,.55)}
+  dialog form{padding:24px;display:flex;flex-direction:column;gap:16px}
+  dialog h2{font-size:20px;font-weight:700}
+  .test-result{font-size:13.5px;min-height:1.4em;color:var(--muted)}
+
+  @media (max-width:1000px){
+    body{overflow:auto}
+    .app{height:auto}
+    .main{grid-template-columns:1fr}
+    .stage{width:100%}
+    .panel{border-left:0;border-top:1px solid var(--line);overflow:visible}
+  }
+  @media (max-width:640px){ .event-meta{display:none} .topbar{padding:12px 16px} }
+  @media (prefers-reduced-motion:reduce){ .count.show,.flash.go,.status-icon.sending{animation-duration:0s} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <img id="logo" class="logo" alt="" hidden>
+    <div class="mark" id="mark" aria-hidden="true">RSC</div>
+    <div class="event">
+      <div class="event-name" id="eventName"></div>
+      <div class="event-theme" id="eventTheme"></div>
+    </div>
+    <div class="event-meta"><strong id="eventDates"></strong><span id="eventVenue"></span></div>
+    <button class="icon-btn" id="openSettings" aria-label="Tetapan">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <div class="main">
+    <main class="stage-wrap">
+      <div class="stage" id="stage">
+        <video id="video" playsinline muted></video>
+        <img id="review" alt="Gambar yang diambil">
+        <canvas id="overlay" width="1600" height="1200"></canvas>
+        <div id="count" class="count" aria-live="assertive"></div>
+        <div id="flash" class="flash"></div>
+        <div id="camError" class="cam-error" hidden>
+          <h2>Kamera tidak dapat dibuka</h2>
+          <p id="camErrorMsg"></p>
+          <button class="btn btn-primary" style="width:auto" id="camRetry">Cuba buka kamera semula</button>
+        </div>
+      </div>
+    </main>
+
+    <aside class="panel">
+      <div class="panel-body">
+        <ol class="steps" aria-label="Langkah">
+          <li><span>Pilih bingkai</span></li>
+          <li><span>Semak gambar</span></li>
+          <li><span>Hantar</span></li>
+        </ol>
+
+        <section class="section" id="pickSection">
+          <h2>Pilih bingkai gambar</h2>
+          <p class="lead">Bingkai dipaparkan terus pada kamera.</p>
+          <div class="frames" id="frames" role="group" aria-label="Bingkai"></div>
+          <button class="btn btn-primary btn-lg" id="shootBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            Ambil gambar
+          </button>
+          <p class="hint">Tekan <kbd>Space</kbd> · kiraan <span id="cdHint">3</span> saat</p>
+        </section>
+
+        <section class="section" id="reviewSection" hidden>
+          <h2>Semak gambar anda</h2>
+          <p class="lead">Ambil semula jika belum berpuas hati.</p>
+          <label class="field">Nama (pilihan)
+            <input id="name" maxlength="60" autocomplete="off" placeholder="cth. Aisyah & rakan">
+          </label>
+          <label class="field">E-mel untuk terima salinan gambar (pilihan)
+            <input id="email" type="email" maxlength="120" autocomplete="off" inputmode="email" placeholder="nama@contoh.com" aria-describedby="emailHint">
+            <span class="field-hint" id="emailHint">E-mel hanya digunakan untuk menghantar gambar ini kepada anda.</span>
+          </label>
+          <label class="consent" id="consentWrap">
+            <input type="checkbox" id="consent">
+            <span>Saya setuju gambar ini disimpan dan digunakan untuk kempen keselamatan jalan raya.</span>
+          </label>
+          <div class="btn-row">
+            <button class="btn btn-primary btn-lg" id="sendBtn" disabled>Hantar gambar</button>
+            <button class="btn btn-secondary" id="retakeBtn">Ambil semula</button>
+          </div>
+          <p class="hint"><kbd>Enter</kbd> hantar · <kbd>Esc</kbd> ambil semula</p>
+        </section>
+
+        <section class="section" id="statusSection" hidden aria-live="polite">
+          <div class="status-icon" id="statusIcon"></div>
+          <h2 id="statusTitle"></h2>
+          <p class="status-msg" id="statusMsg"></p>
+          <div class="btn-row" id="statusBtns"></div>
+        </section>
+      </div>
+      <footer class="panel-foot">Dianjurkan oleh <span id="orgName"></span></footer>
+    </aside>
+  </div>
+</div>
+
+<dialog id="settings">
+  <form method="dialog" id="settingsForm">
+    <h2>Tetapan booth</h2>
+    <label class="field">URL Web App Apps Script (berakhir dengan /exec)
+      <input id="setUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
+    </label>
+    <label class="field">Kunci API (sama seperti dalam Code.gs)
+      <input id="setKey">
+    </label>
+    <label class="field">Nama acara (dicetak pada gambar)
+      <input id="setEvent" maxlength="60">
+    </label>
+    <p class="test-result" id="testResult"></p>
+    <div class="btn-row">
+      <button class="btn btn-primary" value="save" id="saveSettings">Simpan tetapan</button>
+      <button class="btn btn-secondary" type="button" id="testConn">Uji sambungan</button>
+      <button class="btn btn-secondary" value="cancel" formnovalidate>Tutup</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+/* ============================================================
+   CONFIG — edit these defaults. Values saved in Settings (gear icon)
+   on this kiosk override scriptUrl / apiKey / eventName.
+   ============================================================ */
+const CONFIG = {
+  scriptUrl: '',
+  apiKey: '3f9c2a71-8e4b-4d2a-9c1e-5b7f0a6d2e18',
+  eventName: 'Road Safety Congress 2026',
+  eventTheme: 'Safer & Smarter Mobility: Advancing Road Safety Towards Vision Zero',
+  eventDates: '19–20 Oktober 2026',
+  eventVenue: 'MITEC, Kuala Lumpur',
+  organiser: 'Institut Penyelidikan Keselamatan Jalan Raya Malaysia (MIROS)',
+  brandMark: 'RSC',                    // shown when no logo file is set
+  logo: '',                            // e.g. 'logo.png' in the same folder (header + photo stamp)
+  speedLimit: 60,
+  width: 1600, height: 1200,
+  jpegQuality: 0.88,
+  countdown: 3,
+  resetAfter: 10,
+  mirror: true,
+  requireConsent: true
+};
+
+const C = {yellow:'#FFC72C', black:'#1A1A1A', red:'#C8102E', white:'#FFFFFF', asphalt:'#2B2E33', green:'#00704A', soft:'#D3D9D5'};
+const FONT = '"Overpass", "Arial Black", Arial, sans-serif';
+
+/* ---------- Drawing helpers ---------- */
+function rr(ctx,x,y,w,h,r){
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function label(ctx,text,x,y,{size=48,weight=900,color=C.white,align='center',maxW=Infinity}={}){
+  ctx.save();
+  let s=size; ctx.font=`${weight} ${s}px ${FONT}`;
+  while(ctx.measureText(text).width>maxW && s>10){ s-=2; ctx.font=`${weight} ${s}px ${FONT}`; }
+  ctx.textAlign=align; ctx.textBaseline='middle'; ctx.fillStyle=color; ctx.fillText(text,x,y);
+  ctx.restore();
+}
+function pill(ctx,text,x,y,{align='left',size=30,bg='rgba(0,0,0,.6)',color=C.white,img=null}={}){
+  ctx.save(); ctx.font=`700 ${size}px ${FONT}`;
+  const h=size*2, pad=size*0.8, iw=img? h-16 : 0, gap=img? 14 : 0;
+  const w=ctx.measureText(text).width+pad*2+iw+gap;
+  const bx= align==='right'? x-w : x;
+  ctx.fillStyle=bg; rr(ctx,bx,y,w,h,h/2); ctx.fill();
+  if(img){ const s=Math.min(iw/img.width,iw/img.height); ctx.drawImage(img,bx+pad,y+(h-img.height*s)/2,img.width*s,img.height*s); }
+  ctx.fillStyle=color; ctx.textBaseline='middle'; ctx.textAlign='left';
+  ctx.fillText(text,bx+pad+iw+gap,y+h/2+size*0.06);
+  ctx.restore();
+}
+function stamp(ctx,x,y,align){
+  const d=new Date().toLocaleDateString('ms-MY',{day:'numeric',month:'long',year:'numeric'});
+  pill(ctx,`${settings.eventName}  |  ${d}`,x,y,{align,img:logoImg});
+}
+function hazardBorder(ctx,W,H,t){
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,H); ctx.rect(t,t,W-2*t,H-2*t); ctx.clip('evenodd');
+  ctx.fillStyle=C.yellow; ctx.fillRect(0,0,W,H); ctx.fillStyle=C.black;
+  const step=t*1.4;
+  for(let x=-H;x<W+H;x+=step*2){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+step,0); ctx.lineTo(x+step+H,H); ctx.lineTo(x+H,H); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+}
+function speedSign(ctx,cx,cy,r,num){
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=r*0.15; ctx.shadowOffsetY=r*0.04;
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle=C.white; ctx.fill();
+  ctx.shadowColor='transparent';
+  ctx.lineWidth=r*0.2; ctx.strokeStyle=C.red; ctx.beginPath(); ctx.arc(cx,cy,r*0.86,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+  label(ctx,String(num),cx,cy+r*0.06,{size:r*0.95,color:C.black,maxW:r*1.3});
+}
+function roadStrip(ctx,x,y,w,h){
+  ctx.fillStyle=C.asphalt; ctx.fillRect(x,y,w,h);
+  ctx.fillStyle=C.white; ctx.fillRect(x,y+h*0.08,w,h*0.05); ctx.fillRect(x,y+h*0.87,w,h*0.05);
+  const dash=h*1.1, gap=h*0.7;
+  for(let px=x+gap/2;px<x+w;px+=dash+gap) ctx.fillRect(px,y+h*0.46,dash,h*0.08);
+}
+function trafficLight(ctx,x,y,w,active){
+  const h=w*2.6, r=w*0.32;
+  ctx.save(); ctx.fillStyle='#151515'; rr(ctx,x,y,w,h,w*0.22); ctx.fill();
+  [['red','#FF3B30'],['amber','#FFB000'],['green','#22C55E']].forEach(([n,col],i)=>{
+    ctx.beginPath(); ctx.arc(x+w/2,y+h*(0.2+i*0.3),r,0,Math.PI*2);
+    if(n===active){ ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=w*0.6; } else { ctx.fillStyle='#3A3A3A'; ctx.shadowBlur=0; }
+    ctx.fill();
+  });
+  ctx.restore();
+}
+function helmet(ctx,cx,cy,r,color){
+  ctx.save(); ctx.fillStyle=color;
+  ctx.beginPath(); ctx.moveTo(cx-r,cy+r*0.55); ctx.lineTo(cx-r,cy); ctx.arc(cx,cy,r,Math.PI,0);
+  ctx.lineTo(cx+r,cy+r*0.3); ctx.lineTo(cx+r*0.2,cy+r*0.55); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#1F2937'; rr(ctx,cx-r*0.05,cy-r*0.12,r*1.12,r*0.42,r*0.15); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.35)'; rr(ctx,cx+r*0.1,cy-r*0.05,r*0.6,r*0.09,r*0.04); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=r*0.1;
+  ctx.beginPath(); ctx.arc(cx,cy,r*0.72,Math.PI*1.08,Math.PI*1.55); ctx.stroke();
+  ctx.restore();
+}
+
+/* ---------- Frames ----------
+   Each frame is either { name, draw(ctx,W,H) } or { name, src:'frames/my-frame.png' }
+   (a transparent PNG at 1600×1200, e.g. designed in Canva). */
+const FRAMES = [
+  { name:'Pilih selamat', draw(ctx,W,H){
+      const t=36; hazardBorder(ctx,W,H,t);
+      const bh=200; ctx.fillStyle='rgba(26,26,26,.9)'; ctx.fillRect(t,H-t-bh,W-2*t,bh);
+      ctx.fillStyle=C.yellow; ctx.fillRect(t,H-t-bh,W-2*t,8);
+      label(ctx,'SAYA PILIH SELAMAT',W/2,H-t-bh+85,{size:92,color:C.yellow,maxW:W-200});
+      label(ctx,'I choose safety, every journey',W/2,H-t-50,{size:36,weight:700,color:C.soft});
+      // seatbelt corner ribbon
+      ctx.save(); ctx.beginPath(); ctx.rect(t,t,W-2*t,H-2*t); ctx.clip();
+      ctx.translate(W-t,t); ctx.rotate(Math.PI/4);
+      ctx.fillStyle='#3B4048'; ctx.fillRect(-320,150-40,640,80);
+      ctx.strokeStyle=C.yellow; ctx.lineWidth=3; ctx.setLineDash([14,10]);
+      ctx.beginPath(); ctx.moveTo(-320,150-30); ctx.lineTo(320,150-30); ctx.moveTo(-320,150+30); ctx.lineTo(320,150+30); ctx.stroke();
+      ctx.setLineDash([]);
+      label(ctx,'KLIK! TALI PINGGANG',0,152,{size:30,maxW:250});
+      ctx.restore();
+      stamp(ctx,t+28,t+28,'left');
+  }},
+  { name:'Had laju', draw(ctx,W,H){
+      ctx.fillStyle=C.red; ctx.fillRect(0,0,W,16);
+      const px=60, py=H-300, pw=W-120, ph=240;
+      ctx.fillStyle='rgba(26,26,26,.88)'; rr(ctx,px,py,pw,ph,28); ctx.fill();
+      speedSign(ctx,px+150,py+ph/2,150,CONFIG.speedLimit);
+      const tx=px+340, mw=pw-380;
+      label(ctx,'PERLAHAN.',tx,py+72,{size:84,color:C.yellow,align:'left',maxW:mw});
+      label(ctx,'NYAWA TIADA GANTI',tx,py+148,{size:56,align:'left',maxW:mw});
+      label(ctx,'Slow down. A life cannot be replaced.',tx,py+204,{size:30,weight:700,color:C.soft,align:'left',maxW:mw});
+      stamp(ctx,W-40,44,'right');
+  }},
+  { name:'Topi keledar', draw(ctx,W,H){
+      const bh=150; ctx.fillStyle=C.yellow; ctx.fillRect(0,0,W,bh);
+      ctx.fillStyle=C.black; ctx.fillRect(0,bh,W,8);
+      helmet(ctx,130,bh/2-8,62,C.red);
+      label(ctx,'PAKAI TOPI KELEDAR',232,bh/2+6,{size:80,color:C.black,align:'left',maxW:W-290});
+      roadStrip(ctx,0,H-120,W,120);
+      pill(ctx,'Ikat tali dagu dengan kemas  |  Fasten your chin strap',40,H-120-92,{size:32,bg:'rgba(26,26,26,.85)'});
+      stamp(ctx,W-40,bh+34,'right');
+  }},
+  { name:'Lintas selamat', draw(ctx,W,H){
+      const zh=170, zy=H-zh;
+      ctx.fillStyle=C.asphalt; ctx.fillRect(0,zy,W,zh);
+      ctx.fillStyle=C.white; for(let x=30;x<W;x+=140) ctx.fillRect(x,zy+25,70,zh-50);
+      const lw=96, lx=W-170, ly=zy-300;
+      ctx.fillStyle='#3A3A3A'; ctx.fillRect(lx+lw/2-10,ly+lw*2.6-10,20,zy-(ly+lw*2.6)+10);
+      trafficLight(ctx,lx,ly,lw,'green');
+      ctx.fillStyle='rgba(26,26,26,.88)'; rr(ctx,40,40,940,210,24); ctx.fill();
+      label(ctx,'LINTAS DENGAN SELAMAT',80,108,{size:68,color:C.yellow,align:'left',maxW:860});
+      label(ctx,'Pandang kanan, kiri, kanan semula',80,170,{size:40,weight:800,align:'left',maxW:860});
+      label(ctx,'Look right, left, then right again',80,217,{size:28,weight:700,color:C.soft,align:'left',maxW:860});
+      stamp(ctx,W-40,44,'right');
+  }},
+  { name:'Tanpa bingkai', draw(ctx,W,H){ stamp(ctx,40,H-100,'left'); }},
+  // { name:'Bingkai rasmi', src:'frames/bingkai-rasmi.png' },
+];
+
+/* ---------- State ---------- */
+const $=s=>document.querySelector(s);
+const video=$('#video'), stage=$('#stage'), overlay=$('#overlay');
+let settings=loadSettings(), selected=0, state='live', lastShot=null, logoImg=null, resetTimer=null, stream=null;
+
+function loadSettings(){
+  let s={}; try{ s=JSON.parse(localStorage.getItem('rsb-settings')||'{}'); }catch(e){}
+  return { scriptUrl:s.scriptUrl ?? CONFIG.scriptUrl, apiKey:s.apiKey ?? CONFIG.apiKey, eventName:s.eventName ?? CONFIG.eventName };
+}
+function saveSettings(s){ settings=s; try{ localStorage.setItem('rsb-settings',JSON.stringify(s)); }catch(e){} }
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const loadImage=src=>new Promise(res=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; });
+
+function renderHeader(){
+  $('#eventName').textContent=settings.eventName;
+  $('#eventTheme').textContent=CONFIG.eventTheme;
+  $('#eventDates').textContent=CONFIG.eventDates;
+  $('#eventVenue').textContent=CONFIG.eventVenue;
+  $('#orgName').textContent=CONFIG.organiser;
+  $('#mark').textContent=CONFIG.brandMark;
+  if(logoImg){ $('#logo').src=logoImg.src; $('#logo').alt=CONFIG.organiser; $('#logo').hidden=false; $('#mark').hidden=true; }
+}
+
+function drawFrame(ctx,frame,W,H){ if(frame.img) ctx.drawImage(frame.img,0,0,W,H); else frame.draw(ctx,W,H); }
+function renderOverlay(){ const ctx=overlay.getContext('2d'); ctx.clearRect(0,0,overlay.width,overlay.height); drawFrame(ctx,FRAMES[selected],overlay.width,overlay.height); }
+
+function buildFramePicker(){
+  const wrap=$('#frames'); wrap.innerHTML='';
+  FRAMES.forEach((f,i)=>{
+    const b=document.createElement('button'); b.className='frame-btn'; b.setAttribute('aria-pressed',i===selected);
+    const c=document.createElement('canvas'); c.width=400; c.height=300;
+    const ctx=c.getContext('2d'); ctx.scale(400/CONFIG.width,300/CONFIG.height);
+    const W=CONFIG.width, H=CONFIG.height, g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#7A8699'); g.addColorStop(1,'#3A4457'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(255,255,255,.2)'; ctx.beginPath(); ctx.arc(W/2,H*0.42,H*0.16,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(W/2,H*0.98,W*0.22,H*0.32,0,0,7); ctx.fill();
+    drawFrame(ctx,f,W,H);
+    const s=document.createElement('span'); s.textContent=f.name;
+    b.append(c,s);
+    b.onclick=()=>{ selected=i; wrap.querySelectorAll('.frame-btn').forEach((x,j)=>x.setAttribute('aria-pressed',j===i)); renderOverlay(); };
+    wrap.append(b);
+  });
+}
+
+const STEP={live:1,countdown:1,review:2,sending:3,done:3,error:3};
+function setState(s){
+  state=s;
+  $('#pickSection').hidden=!(s==='live'||s==='countdown');
+  $('#reviewSection').hidden=s!=='review';
+  $('#statusSection').hidden=!['sending','done','error'].includes(s);
+  stage.classList.toggle('reviewing',!['live','countdown'].includes(s));
+  $('#shootBtn').disabled=s!=='live';
+  document.querySelectorAll('.frame-btn').forEach(b=>b.disabled=s!=='live');
+  document.querySelectorAll('.steps li').forEach((li,i)=>{
+    const n=i+1, cur=STEP[s];
+    li.classList.toggle('done', n<cur || (s==='done' && n===cur));
+    if(n===cur && s!=='done') li.setAttribute('aria-current','step'); else li.removeAttribute('aria-current');
+  });
+}
+
+/* ---------- Camera ---------- */
+async function startCamera(){
+  $('#camError').hidden=true;
+  if(!window.isSecureContext || !navigator.mediaDevices){
+    return camFail('Halaman ini perlu dibuka melalui https:// atau http://localhost supaya kamera dibenarkan.');
+  }
+  try{
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1920},height:{ideal:1080},facingMode:'user'},audio:false});
+    video.srcObject=stream; video.classList.toggle('mirror',CONFIG.mirror); await video.play();
+    if(state==='live') $('#shootBtn').disabled=false;
+  }catch(e){
+    camFail(e.name==='NotAllowedError' ? 'Akses kamera ditolak. Benarkan kamera untuk laman ini dalam tetapan pelayar, kemudian cuba semula.'
+          : e.name==='NotFoundError' ? 'Tiada kamera dikesan. Sambungkan webcam dan cuba semula.'
+          : 'Kamera sedang digunakan oleh aplikasi lain atau tidak dapat dibuka ('+e.name+').');
+  }
+}
+function camFail(msg){ $('#camErrorMsg').textContent=msg; $('#camError').hidden=false; $('#shootBtn').disabled=true; }
+
+/* ---------- Capture ---------- */
+function showCount(n){ const el=$('#count'); el.textContent=n; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
+function drawVideoCover(ctx,v,W,H,mirror){
+  const sc=Math.max(W/v.videoWidth,H/v.videoHeight), dw=v.videoWidth*sc, dh=v.videoHeight*sc;
+  ctx.save(); if(mirror){ ctx.translate(W,0); ctx.scale(-1,1); }
+  ctx.drawImage(v,(W-dw)/2,(H-dh)/2,dw,dh); ctx.restore();
+}
+async function shoot(){
+  if(state!=='live' || !video.videoWidth) return;
+  setState('countdown');
+  for(let n=CONFIG.countdown;n>0;n--){ showCount(n); await sleep(1000); }
+  const f=$('#flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+  const c=document.createElement('canvas'); c.width=CONFIG.width; c.height=CONFIG.height;
+  const ctx=c.getContext('2d');
+  drawVideoCover(ctx,video,c.width,c.height,CONFIG.mirror);
+  drawFrame(ctx,FRAMES[selected],c.width,c.height);
+  lastShot={ dataUrl:c.toDataURL('image/jpeg',CONFIG.jpegQuality), frame:FRAMES[selected].name, takenAt:new Date().toISOString() };
+  $('#review').src=lastShot.dataUrl;
+  $('#name').value=''; $('#email').value=''; $('#consent').checked=false; updateSendBtn();
+  setState('review');
+}
+const EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+function emailOk(){ const v=$('#email').value.trim(); return !v || EMAIL_RE.test(v); }
+function updateSendBtn(){
+  const ok=emailOk(), hint=$('#emailHint');
+  hint.textContent= ok ? 'E-mel hanya digunakan untuk menghantar gambar ini kepada anda.' : 'Semak e-mel. Formatnya belum lengkap.';
+  hint.classList.toggle('bad',!ok);
+  $('#sendBtn').disabled = (CONFIG.requireConsent && !$('#consent').checked) || !ok;
+}
+
+/* ---------- Upload ---------- */
+const ICONS={
+  done:'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  error:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M12 7v6.5M12 17.5v.01"/></svg>'
+};
+function showStatus(kind,title,msg,buttons=[]){
+  setState(kind);
+  $('#statusIcon').className='status-icon '+kind;
+  $('#statusIcon').innerHTML=ICONS[kind]||'';
+  $('#statusTitle').textContent=title; $('#statusMsg').textContent=msg;
+  const row=$('#statusBtns'); row.innerHTML='';
+  buttons.forEach(([text,cls,fn,id])=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=text; b.onclick=fn; if(id) b.id=id; row.append(b); });
+}
+async function send(){
+  if(!lastShot || state!=='review') return;
+  if(!settings.scriptUrl){
+    showStatus('error','URL Apps Script belum ditetapkan','Buka Tetapan dan tampal URL Web App yang berakhir dengan /exec.',
+      [['Buka tetapan','btn-primary',openSettings],['Muat turun gambar','btn-secondary',download],['Kembali','btn-secondary',()=>setState('review')]]);
+    return;
+  }
+  showStatus('sending','Menghantar gambar','Sila tunggu sebentar.');
+  const ctrl=new AbortController(), timer=setTimeout(()=>ctrl.abort(),45000);
+  try{
+    // Plain-text body keeps this a "simple" request, so Apps Script accepts it without a CORS preflight.
+    const res=await fetch(settings.scriptUrl,{ method:'POST', signal:ctrl.signal, body:JSON.stringify({
+      key:settings.apiKey, image:lastShot.dataUrl, name:$('#name').value.trim().slice(0,60),
+      frame:lastShot.frame, event:settings.eventName, takenAt:lastShot.takenAt,
+      email:$('#email').value.trim() })});
+    const data=await res.json().catch(()=>({ok:false,error:'Jawapan pelayan tidak sah. Semak URL /exec dan akses "Anyone".'}));
+    if(!data.ok) throw new Error(data.error||'Pelayan menolak gambar.');
+    lastShot=null;
+    let n=CONFIG.resetAfter;
+    const doneMsg = data.emailed ? 'Gambar anda sudah disimpan dan dihantar ke e-mel anda. Semak juga folder spam.'
+                  : data.emailError ? 'Gambar anda sudah disimpan, tetapi e-mel tidak dapat dihantar. Sila maklumkan petugas booth.'
+                  : 'Gambar anda sudah disimpan. Selamat sampai ke destinasi.';
+    showStatus('done','Terima kasih',doneMsg,[[`Seterusnya (${n})`,'btn-primary btn-lg',reset,'nextBtn']]);
+    clearInterval(resetTimer);
+    resetTimer=setInterval(()=>{ n--; const b=$('#nextBtn'); if(b) b.textContent=`Seterusnya (${n})`; if(n<=0) reset(); },1000);
+  }catch(err){
+    const msg= err.name==='AbortError' ? 'Masa menunggu tamat. Semak sambungan internet kiosk.'
+             : err instanceof TypeError ? 'Tidak dapat menghubungi pelayan. Semak internet dan URL Apps Script.'
+             : err.message;
+    showStatus('error','Gambar belum dihantar',msg+' Gambar masih ada. Cuba lagi atau muat turun.',
+      [['Cuba hantar semula','btn-primary',()=>{ setState('review'); send(); }],['Muat turun gambar','btn-secondary',download],['Mula semula','btn-secondary',reset]]);
+  }finally{ clearTimeout(timer); }
+}
+function download(){
+  if(!lastShot) return;
+  const a=document.createElement('a'); a.href=lastShot.dataUrl;
+  a.download='booth-'+lastShot.takenAt.replace(/[:.]/g,'-')+'.jpg'; a.click();
+}
+function reset(){ clearInterval(resetTimer); lastShot=null; $('#review').removeAttribute('src'); setState('live'); if(!video.videoWidth) $('#shootBtn').disabled=true; $('#shootBtn').focus(); }
+
+/* ---------- Settings ---------- */
+function openSettings(){
+  $('#setUrl').value=settings.scriptUrl; $('#setKey').value=settings.apiKey; $('#setEvent').value=settings.eventName;
+  $('#testResult').textContent=''; $('#settings').showModal();
+}
+$('#settingsForm').addEventListener('submit',e=>{
+  if(e.submitter && e.submitter.value==='save'){
+    saveSettings({ scriptUrl:$('#setUrl').value.trim(), apiKey:$('#setKey').value.trim(), eventName:$('#setEvent').value.trim()||CONFIG.eventName });
+    renderHeader(); buildFramePicker(); renderOverlay(); setState(state);
+  }
+});
+$('#testConn').onclick=async()=>{
+  const out=$('#testResult'), url=$('#setUrl').value.trim();
+  if(!url){ out.textContent='Masukkan URL dahulu.'; return; }
+  out.textContent='Menguji sambungan…';
+  try{ const d=await (await fetch(url)).json(); out.textContent= d.ok ? 'Sambungan berjaya. Pelayan sedia menerima gambar.' : 'Pelayan menjawab tetapi tidak sedia.'; }
+  catch(e){ out.textContent='Gagal. Pastikan URL berakhir dengan /exec dan akses ditetapkan kepada "Anyone".'; }
+};
+
+/* ---------- Wiring ---------- */
+$('#shootBtn').onclick=shoot;
+$('#sendBtn').onclick=send;
+$('#retakeBtn').onclick=reset;
+$('#consent').onchange=updateSendBtn;
+$('#email').oninput=updateSendBtn;
+$('#camRetry').onclick=startCamera;
+$('#openSettings').onclick=openSettings;
+$('#cdHint').textContent=CONFIG.countdown;
+if(!CONFIG.requireConsent) $('#consentWrap').hidden=true;
+
+document.addEventListener('keydown',e=>{
+  if($('#settings').open) return;
+  const typing=e.target.tagName==='INPUT' && e.target.type!=='checkbox';
+  if(e.code==='Space' && !typing){
+    if(state==='live'){ e.preventDefault(); shoot(); }
+    else if(state==='done'){ e.preventDefault(); reset(); }
+  }else if(e.key==='Enter' && state==='review' && !$('#sendBtn').disabled){ e.preventDefault(); send(); }
+  else if(e.key==='Escape' && state==='review'){ reset(); }
+  else if(e.key===',' && e.ctrlKey){ e.preventDefault(); openSettings(); }
+});
+
+(async function init(){
+  try{ await Promise.race([Promise.all([document.fonts.load('900 80px "Overpass"'),document.fonts.load('700 30px "Overpass"'),document.fonts.load('600 16px "Public Sans"')]),sleep(2500)]); }catch(e){}
+  if(CONFIG.logo) logoImg=await loadImage(CONFIG.logo);
+  for(const f of FRAMES) if(f.src) f.img=await loadImage(f.src);
+  for(let i=FRAMES.length-1;i>=0;i--) if(FRAMES[i].src && !FRAMES[i].img) FRAMES.splice(i,1);
+  renderHeader(); buildFramePicker(); renderOverlay(); setState('live'); $('#shootBtn').disabled=true; startCamera();
+})();
+</script>
+</body>
+</html>
